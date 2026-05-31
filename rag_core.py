@@ -6,13 +6,14 @@ import chromadb
 from chromadb.utils import embedding_functions
 import ollama
 
-# ---------- 配置 ----------
+# 配置
 CHROMA_PATH = "./chroma_db"
 COLLECTION_NAME = "doc_chunks"
-CHUNK_SIZE = 200          # 小块，便于精准匹配
+CHUNK_SIZE = 200
 CHUNK_OVERLAP = 20
-TOP_K = 5                 # 检索返回的块数（由3增至5，提高命中率）
+TOP_K = 15   # 关键：检索15个块，覆盖几乎所有内容
 
+# 使用 Ollama 的嵌入模型
 embedding_fn = embedding_functions.OllamaEmbeddingFunction(
     model_name="nomic-embed-text",
     url="http://localhost:11434/api/embeddings"
@@ -24,7 +25,6 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=embedding_fn
 )
 
-# ---------- 文档处理 ----------
 def extract_text_from_pdf(pdf_path: str) -> str:
     reader = PdfReader(pdf_path)
     text = ""
@@ -67,7 +67,6 @@ def index_document(file_content: bytes, filename: str) -> int:
     ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
     metadatas = [{"source": filename, "chunk_index": i} for i in range(len(chunks))]
 
-    # 清除旧索引，避免重复
     existing = collection.get(where={"source": filename})
     if existing['ids']:
         collection.delete(ids=existing['ids'])
@@ -82,7 +81,7 @@ def query_document(question: str) -> Tuple[str, List[str]]:
         return "未在文档中找到相关内容，请先上传相关文档。", []
 
     context = "\n\n".join(retrieved_chunks)
-    prompt = f"""请根据下面给出的文档内容回答用户的问题。如果文档中包含答案，请用完整的中文句子回答，并且尽量引用原文；如果文档中完全没有相关信息，则回答“文档中未提及”。
+    prompt = f"""请根据下面给出的文档内容回答用户的问题。如果文档中包含答案，请用完整的中文句子回答，并尽量引用原文；如果完全没有相关信息，则回答“文档中未提及”。
 
 文档内容：
 {context}
@@ -92,9 +91,9 @@ def query_document(question: str) -> Tuple[str, List[str]]:
 回答："""
 
     response = ollama.chat(
-        model="qwen2.5:1.5b",   # 或 "llama3.2:1b"
+        model="qwen2.5:1.5b",
         messages=[{"role": "user", "content": prompt}],
-        options={"temperature": 0.2}
+        options={"temperature": 0.1}
     )
     answer = response['message']['content'].strip()
     return answer, retrieved_chunks
