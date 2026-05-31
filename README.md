@@ -27,3 +27,13 @@ ollama pull nomic-embed-text
 
 # 3. 启动服务
 python main.py
+```
+
+
+
+
+
+## 运行示例
+
+![提问电池续航](./screenshot.png)
+
